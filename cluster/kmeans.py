@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.spatial.distance import cdist
+import warnings
 
 
 class KMeans:
@@ -19,7 +20,25 @@ class KMeans:
                 the minimum error tolerance from previous error during optimization to quit the model fit
             max_iter: int
                 the maximum number of iterations before quitting model fit
-        """
+                """
+        # Check for valid Inputs
+        if (type(k)!= int) or k <1 :
+            raise ValueError("Invaild k, K must be an integer greater or equal to 1")
+        if tol < 0:
+            raise ValueError("tol must be a postive value")
+        if (type(max_iter)!= int) or max_iter <1 :
+            raise ValueError("max_iter must be an integer greater or equal to 1")
+        
+        # assign Inital values
+        self.k=k
+        self.tol =tol
+        self.max_iter= max_iter
+
+       
+
+
+
+
 
     def fit(self, mat: np.ndarray):
         """
@@ -29,6 +48,7 @@ class KMeans:
         with the tolerance, then you will use .predict() to identify the
         clusters that best match some data that is provided.
 
+
         In sklearn there is also a fit_predict() method that combines these
         functions, but for now we will have you implement them both separately.
 
@@ -36,6 +56,79 @@ class KMeans:
             mat: np.ndarray
                 A 2D matrix where the rows are observations and columns are features
         """
+        # Check that there are at least as many data points as clusters
+        if mat.shape[0] < self.k:
+            raise ValueError("Data must include at least k datapoints")
+
+        # Intlize random seed
+        rng=np.random.default_rng(None)
+        # Intilize centers to random values
+
+        #  Choose k random starting points as initial clusters
+        number_of_rows = mat.shape[0] 
+        random_indices = rng.choice(number_of_rows,  
+                                  size=self.k,  
+                                  replace=False)
+        self.centers= mat[random_indices, :]
+        
+
+        # Set up ending criteria
+        iters=0
+        derr=1
+        err=1
+        
+        while iters < self.max_iter and derr > self.tol:
+            # Calculate distance between all points and centers
+            dists= cdist(self.centers, mat, 'euclidean')
+            
+            # Find which cluster each belongs to 
+            min_dists = np.argmin(dists, axis=0)
+            
+            
+            # One hot encode the cluster
+            one_hot_matrix = np.eye(self.k)[min_dists]
+
+            # Calculate total error
+            # Get all the distances based on what the closest cluster is
+            each_dist=[]
+            for i, value in enumerate(min_dists):
+                each_dist.append(dists[value][i])
+            
+            # square all distances and sum to get root mean squared erro
+            each_dist=[x ** 2 for x in each_dist]
+            rms=sum(each_dist)
+            
+
+            # Calculate new center as averge of all points in cluster
+
+            # Calculate the sum of values for each group
+            sum_values = np.dot(one_hot_matrix.T, mat)
+            
+
+            # Count the number of occurrences for each group
+            group_counts = np.sum(one_hot_matrix, axis=0)
+
+            # Avoid division by zero
+            group_counts[group_counts == 0] = 1
+            # If empty cluater == Failure
+            #raise ValueError("Cluster lost, convergence failed")
+
+            # Calculate the average values for each group
+            # Note if no poiints are assigned to a cluster cluster is reset to 0,0
+            self.centers = sum_values / group_counts[:, np.newaxis]
+        
+            # Derr is the percentage change is 
+            derr= abs(err-rms)/err
+            err=rms
+            # Increment the interartions
+            iters += 1
+        if iters == self.max_iter and derr >self.tol:
+            warnings.warn("Failed to converge after {} iterations".format(self.max_iter))
+        if iters < self.max_iter and derr < self.tol:
+            print("Converged after {} interations".format(iters))
+        # Assign error
+        self.error=err
+
 
     def predict(self, mat: np.ndarray) -> np.ndarray:
         """
@@ -53,6 +146,12 @@ class KMeans:
             np.ndarray
                 a 1D array with the cluster label for each of the observations in `mat`
         """
+        # Calculate distance between all points and centers
+        dists= cdist(self.centers, mat, 'euclidean')
+        
+        # Find which cluster each belongs to 
+        min_dists = np.argmin(dists, axis=0)
+        return min_dists
 
     def get_error(self) -> float:
         """
@@ -63,6 +162,7 @@ class KMeans:
             float
                 the squared-mean error of the fit model
         """
+        return self.error
 
     def get_centroids(self) -> np.ndarray:
         """
@@ -72,3 +172,4 @@ class KMeans:
             np.ndarray
                 a `k x m` 2D matrix representing the cluster centroids of the fit model
         """
+        return self.centers
