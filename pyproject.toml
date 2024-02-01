@@ -22,7 +22,7 @@ dependencies = [
 	"numpy",
 	"scipy",
     "warnings",
-	"sklearn",
+	"scikit-learn",
 	"statistics"
 ]
 
